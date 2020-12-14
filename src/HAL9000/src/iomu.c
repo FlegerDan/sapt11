@@ -68,7 +68,8 @@ typedef struct _IOMU_DATA
     QWORD                       TscFrequency;
 
     LIST_ENTRY                  PciDeviceList;
-
+    BITMAP SwapBitmap;
+    PVOID SwapBitmapData;
     LIST_ENTRY                  PciBridgeList;
 
     LIST_ENTRY                  DriverList;
@@ -537,7 +538,11 @@ IomuLateInit(
     {
         LOGL("Successfully determined swap partition!\n");
     }
+    DWORD bitmapSize = BitmapPreinit(&m_iomuData.SwapBitmap, m_iomuData.SwapFileSize / PAGE_SIZE);
 
+    m_iomuData.SwapBitmapData = ExAllocatePoolWithTag(PoolAllocatePanicIfFail, bitmapSize, HEAP_IOMU_TAG, 0);
+
+    BitmapInit(&m_iomuData.SwapBitmap, m_iomuData.SwapBitmapData);
     return STATUS_SUCCESS;
 }
 
@@ -1271,7 +1276,33 @@ _IomuInitializeSwapFile(
         }
         bOpenedSwapFile = TRUE;
     }
+    PARTITION_INFORMATION partitionInformation;
+    PIRP pIrp = IoBuildDeviceIoControlRequest(IOCTL_VOLUME_PARTITION_INFO,
+        pVpb->VolumeDevice,
+        NULL,
+        0,
+        &partitionInformation,
+        sizeof(PARTITION_INFORMATION));
+    if (NULL == pIrp)
+    {
+        LOG_ERROR("IoBuildDeviceIoControlRequest failed\n");
+        continue;
+    }
 
+    status = IoCallDriver(pVpb->VolumeDevice, pIrp);
+    if (!SUCCEEDED(status))
+    {
+        LOG_FUNC_ERROR("IoCallDriver", status);
+        continue;
+    }
+
+    if (!SUCCEEDED(pIrp->IoStatus.Status))
+    {
+        LOG_FUNC_ERROR("IoCallDriver", pIrp->IoStatus.Status);
+        continue;
+    }
+
+    LOG("swap size is %U bytes!\n", partitionInformation.PartitionSize * SECTOR_SIZE);
     return bOpenedSwapFile ? STATUS_SUCCESS : STATUS_FILE_NOT_FOUND;
 }
 
