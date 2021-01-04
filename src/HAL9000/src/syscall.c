@@ -304,3 +304,28 @@ SyscallReadMemory(
 }
 
 
+STATUS
+SwapOut(
+    QWORD PAGE_SIZE
+)
+{
+    char b;
+    PBYTE pAddress;
+
+    SyscallVirtualAlloc(NULL, 8 * PAGE_SIZE, VMM_ALLOC_TYPE_COMMIT | VMM_ALLOC_TYPE_RESERVE, PAGE_RIGHTS_READWRITE, UM_INVALID_HANDLE_VALUE, 0, &pAddress);
+
+    memset(pAddress, 0x91, 8 * PAGE_SIZE);
+
+    SwapOut(pAddress);
+
+    for (DWORD i = 0; i < 8 * PAGE_SIZE; ++i)
+    {
+        LOG("Value at offset %u is 0x%x\n", i, pAddress[i]);
+    }
+
+    // swap out the stack
+    SwapOut(&b);
+
+    // Lets have some fun
+    SwapOut(NULL);
+}

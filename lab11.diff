@@ -1,0 +1,90 @@
+diff --git a/src/.vs/HAL9000/v16/Browse.VC.db b/src/.vs/HAL9000/v16/Browse.VC.db
+index ab5b988..27a641f 100644
+Binary files a/src/.vs/HAL9000/v16/Browse.VC.db and b/src/.vs/HAL9000/v16/Browse.VC.db differ
+diff --git a/src/HAL9000/src/iomu.c b/src/HAL9000/src/iomu.c
+index 0424d4a..8d641a8 100644
+--- a/src/HAL9000/src/iomu.c
++++ b/src/HAL9000/src/iomu.c
+@@ -538,6 +538,13 @@ IomuLateInit(
+     {
+         LOGL("Successfully determined swap partition!\n");
+     }
++
++    DWORD bitmapSize = BitmapPreinit(&m_iomuData.SwapBitmap, m_iomuData.SwapFileSize / PAGE_SIZE);
++
++    m_iomuData.SwapBitmapData = ExAllocatePoolWithTag(PoolAllocatePanicIfFail, bitmapSize, HEAP_IOMU_TAG, 0);
++
++    BitmapInit(&m_iomuData.SwapBitmap, m_iomuData.SwapBitmapData);
++
+      return STATUS_SUCCESS;
+ }
+ 
+@@ -1271,7 +1278,33 @@ _IomuInitializeSwapFile(
+         }
+         bOpenedSwapFile = TRUE;
+     }
+-   
++    PARTITION_INFORMATION partitionInformation;
++    PIRP pIrp = IoBuildDeviceIoControlRequest(IOCTL_VOLUME_PARTITION_INFO,
++        pVpb->VolumeDevice,
++        NULL,
++        0,
++        &partitionInformation,
++        sizeof(PARTITION_INFORMATION));
++    if (NULL == pIrp)
++    {
++        LOG_ERROR("IoBuildDeviceIoControlRequest failed\n");
++        continue;
++    }
++
++    status = IoCallDriver(pVpb->VolumeDevice, pIrp);
++    if (!SUCCEEDED(status))
++    {
++        LOG_FUNC_ERROR("IoCallDriver", status);
++        continue;
++    }
++
++    if (!SUCCEEDED(pIrp->IoStatus.Status))
++    {
++        LOG_FUNC_ERROR("IoCallDriver", pIrp->IoStatus.Status);
++        continue;
++    }
++
++    LOG("swap size is %U bytes!\n", partitionInformation.PartitionSize * SECTOR_SIZE);
+     return bOpenedSwapFile ? STATUS_SUCCESS : STATUS_FILE_NOT_FOUND;
+ }
+ 
+diff --git a/src/HAL9000/src/syscall.c b/src/HAL9000/src/syscall.c
+index 203b4d9..707287d 100644
+--- a/src/HAL9000/src/syscall.c
++++ b/src/HAL9000/src/syscall.c
+@@ -304,3 +304,28 @@ SyscallReadMemory(
+ }
+ 
+ 
++STATUS
++SwapOut(
++    QWORD PAGE_SIZE
++)
++{
++    char b;
++    PBYTE pAddress;
++
++    SyscallVirtualAlloc(NULL, 8 * PAGE_SIZE, VMM_ALLOC_TYPE_COMMIT | VMM_ALLOC_TYPE_RESERVE, PAGE_RIGHTS_READWRITE, UM_INVALID_HANDLE_VALUE, 0, &pAddress);
++
++    memset(pAddress, 0x91, 8 * PAGE_SIZE);
++
++    SwapOut(pAddress);
++
++    for (DWORD i = 0; i < 8 * PAGE_SIZE; ++i)
++    {
++        LOG("Value at offset %u is 0x%x\n", i, pAddress[i]);
++    }
++
++    // swap out the stack
++    SwapOut(&b);
++
++    // Lets have some fun
++    SwapOut(NULL);
++}
+\ No newline at end of file
