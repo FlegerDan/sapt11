@@ -4,6 +4,7 @@
 #include "ref_cnt.h"
 #include "ex_event.h"
 #include "thread.h"
+#include "io.h"
 
 typedef enum _THREAD_STATE
 {
@@ -40,6 +41,9 @@ typedef struct _THREAD
     TID                     Id;
     char*                   Name;
 
+    PFILE_OBJECT            fisier;
+    QWORD                   sum;
+
     // Currently the thread priority is not used for anything
     THREAD_PRIORITY         Priority;
     THREAD_STATE            State;
@@ -63,6 +67,15 @@ typedef struct _THREAD
     // List of the threads in the same process
     LIST_ENTRY              ProcessList;
 
+    // parintele
+    PTHREAD                 Parinte;
+    //list of the child threads;
+    LIST_ENTRY              CopiiList;
+
+    LIST_ENTRY              Copil;
+
+
+    QWORD                   TimesYielded;
     // Incremented on each clock tick for the running thread
     QWORD                   TickCountCompleted;
 
@@ -282,3 +295,15 @@ void
 ThreadSetPriority(
     IN      THREAD_PRIORITY     NewPriority
     );
+void ThreadGetNrThreads
+(
+    OUT QWORD* nrexist,
+    OUT QWORD* nrblocked,
+    OUT QWORD* nrready
+);
+
+
+void ThreadMutexWaitingList
+(
+    IN PLIST_ENTRY test
+);

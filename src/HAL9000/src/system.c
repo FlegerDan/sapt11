@@ -45,6 +45,7 @@ SystemPreinit(
 
     BootModulesPreinit();
     DumpPreinit();
+    MutexSystemPreinit();
     ThreadSystemPreinit();
     printSystemPreinit(NULL);
     LogSystemPreinit();
@@ -70,15 +71,11 @@ SystemInit(
     status = STATUS_SUCCESS;
     pCpu = NULL;
 
-    /*LogSystemInit(LogLevelInfo,
+    LogSystemInit(LogLevelInfo,
                   LogComponentInterrupt | LogComponentIo | LogComponentAcpi,
                   TRUE
                   );
-*/
-    LogSystemInit(LogLevelTrace, LogComponentMmu |
-        LogComponentUserMode | LogComponentIo | LogComponentAcpi,
-        TRUE
-    );
+
     // if validation fails => the system will HALT
     CpuMuValidateConfiguration();
 

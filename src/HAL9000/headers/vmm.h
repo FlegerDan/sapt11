@@ -307,7 +307,3 @@ VmmIsBufferValid(
     IN          PVMM_RESERVATION_SPACE              ReservationSpace,
     IN          BOOLEAN                             KernelAccess
     );
-PVMM_RESERVATION_SPACE
-VmmRetrieveReservationSpaceForSystemProcess(
-    void
-);

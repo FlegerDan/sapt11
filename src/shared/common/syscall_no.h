@@ -27,8 +27,6 @@ typedef enum _SYSCALL_ID
     SyscallIdFileClose,
     SyscallIdFileRead,
     SyscallIdFileWrite,
-    //lab7
-    SyscallIdProcessGetNumberOfPages,
-    SyscallIdReadMemory,
+
     SyscallIdReserved = SyscallIdFileWrite + 1
 } SYSCALL_ID;

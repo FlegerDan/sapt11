@@ -306,20 +306,3 @@ SyscallFileWrite(
     IN  QWORD                       BytesToWrite,
     OUT QWORD*                      BytesWritten
     );
-
-STATUS
-SyscallProcessGetNumberOfPages(
-    OUT     DWORD* PagesCommitted,
-    OUT     DWORD* PagesReserved
-);
-
-STATUS
-SyscallReadMemory(
-    IN_READS(1)     PBYTE   Address,
-    OUT             PBYTE   ValueRead
-);
-
-STATUS
-SwapOut(
-    QWORD PAGE_SIZE
-);

@@ -126,8 +126,6 @@ _VmIsKernelAddress(
     IN      PVOID                   Address
     )
 {
-    LOG(" AICI virtual physical address 0x%X\n", Address);
-      
     return IsBooleanFlagOn((QWORD)Address, (QWORD)1 << VA_HIGHEST_VALID_BIT);
 }
 
@@ -271,8 +269,7 @@ VmmMapMemoryInternal(
     ctx.Uncacheable = Uncacheable;
 
     cr3.Raw = (QWORD) PagingData->BasePhysicalAddress;
-    LOG("Will map virtual address 0x%X to physical address 0x%X\n",
-        BaseAddress, PhysicalAddress); // aci
+
     _VmWalkPagingTables(cr3,
                         BaseAddress,
                         Size,
@@ -404,14 +401,10 @@ VmmSetupPageTables(
     PagingData->BasePhysicalAddress = BasePhysicalAddress;
     PagingData->KernelSpace = KernelStructures;
 
-    /*
     LOG_TRACE_VMM("Will setup paging tables at physical address: 0x%X\n", PagingData->BasePhysicalAddress);
     LOG_TRACE_VMM("BaseAddress: 0x%X\n", pBaseVirtualAddress);
     LOG_TRACE_VMM("Size of paging tables: 0x%x\n", sizeReservedForPagingStructures);
-    */
-    LOG("Will setup paging tables at physical address: 0x%X\n", PagingData->BasePhysicalAddress);
-    LOG("BaseAddress: 0x%X\n", pBaseVirtualAddress);
-    LOG("Size of paging tables: 0x%x\n", sizeReservedForPagingStructures);
+
     // 1. We cannot zero the memory before mapping it (because it's not mapped)
     // 2. We cannot zero it after it was mapped because we already have some entries
     // populated to describe the mapped memory.
@@ -427,10 +420,8 @@ VmmSetupPageTables(
                          TRUE,
                          FALSE
                          );
-    /*
     LOG_TRACE_VMM("VmmMapMemoryInternal finished\n");
-    */
-    LOG("VmmMapMemoryInternal finished\n");
+
     if (PagingDataWhereToMap != PagingData)
     {
         // Zero the newly mapped PML4 if we didn't map it in it's own
@@ -577,8 +568,6 @@ VmmAllocRegionEx(
             LOG_FUNC_ERROR("VmReservationSpaceAllocRegion", status);
             __leave;
         }
-        LOG("Allocating for VaSpace at 0x%X, a memory region from 0x%X of size 0x%X\n",
-            pVaSpace, pBaseAddress, alignedSize);
         ASSERT(NULL != pBaseAddress);
 
         if (IsBooleanFlagOn(AllocType, VMM_ALLOC_TYPE_NOT_LAZY))

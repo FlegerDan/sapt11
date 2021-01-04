@@ -16,6 +16,7 @@
 #include "ex_timer.h"
 #include "vmm.h"
 #include "pit.h"
+#include "mutex.h"
 
 
 #pragma warning(push)
@@ -73,6 +74,8 @@ _CmdReadAndDumpCpuid(
 
 static FUNC_ListFunction _CmdThreadPrint;
 
+static FUNC_ListFunction _CmdMutexPrint;
+
 void
 (__cdecl CmdListCpus)(
     IN          QWORD       NumberOfParameters
@@ -129,6 +132,7 @@ void
 
     ASSERT(NumberOfParameters == 0);
 
+    LOG("%8s", "PTID|");
     LOG("%7s", "TID|");
     LOG("%20s", "Name|");
     LOG("%5s", "Prio|");
@@ -141,6 +145,30 @@ void
 
     status = ThreadExecuteForEachThreadEntry(_CmdThreadPrint, NULL );
     ASSERT( SUCCEEDED(status));
+}
+void
+(__cdecl CmdListInfoThreads)(
+    IN          QWORD       NumberOfParameters
+    )
+{
+    //STATUS status;
+
+    ASSERT(NumberOfParameters == 0);
+
+    LOG("%10s", "NumarFireSistem|");
+    LOG("%10s", "NumarFireBlocate|");
+    LOG("%10s", "NumarFireReady|");
+    
+    LOG("\n");
+    QWORD nrsistem=0;
+    QWORD nrblocate=0;
+    QWORD nrready=0;
+    ThreadGetNrThreads(&nrsistem, &nrblocate, &nrready);
+    LOG("%9U,%c", nrsistem, '|');
+    LOG("%9U,%c", nrblocate, '|');
+    LOG("%9U,%c", nrready, '|');
+    //status = ThreadExecuteForEachThreadEntry(_CmdThreadPrint, NULL);
+    //ASSERT(SUCCEEDED(status));
 }
 
 void
@@ -684,7 +712,14 @@ STATUS
     ASSERT( NULL == FunctionContext );
 
     pThread = CONTAINING_RECORD(ListEntry, THREAD, AllList );
-
+    if (pThread->Parinte != NULL)
+    {
+        LOG("%6x%c", pThread->Parinte->Id, '|');
+    }
+    else
+    {
+        LOG("%6x%c", -1, '|');// black guy 
+    }
     LOG("%6x%c", pThread->Id, '|');
     LOG("%19s%c", pThread->Name, '|');
     LOG("%4U%c", pThread->Priority, '|');
@@ -773,5 +808,188 @@ STATUS
 
     return STATUS_SUCCESS;
 }
+
+STATUS
+(__cdecl Test1)(
+    IN_OPT      PVOID       Context
+    )
+{
+    STATUS status = STATUS_SUCCESS;
+    QWORD sum = 0;
+    INTR_STATE oldIntrState;
+    
+    QWORD useless=0;
+    QWORD* test = (QWORD *)Context;
+    do
+    {
+        PBYTE buffer;
+        buffer = NULL;
+        buffer = ExAllocatePoolWithTag(0, sizeof(char)*100, HEAP_TEMP_TAG, 0);
+        if (NULL == buffer)
+        {
+           // perror("HeapAllocatePoolWithTag failed for file size: %D KB\n", allocationSize / KB_SIZE);
+            perror("strigate de durere");
+        }
+        LockAcquire(&GetCurrentThread()->BlockLock,&oldIntrState);
+        status=IoReadFile(GetCurrentThread()->fisier,1,test, &buffer,&useless);
+        
+        sum += 1;
+        LockRelease(&GetCurrentThread()->BlockLock, oldIntrState);
+        if (NULL != buffer)
+        {
+            ExFreePoolWithTag(buffer, HEAP_TEMP_TAG);
+            buffer = NULL;
+        }
+    } while (status == STATUS_SUCCESS);
+    GetCurrentThread()->sum = sum;
+   
+    return STATUS_SUCCESS;
+}
+
+void
+(__cdecl CmdIHateYou)(
+    IN      QWORD       NumberOfParameters,
+    IN_Z    char* N,
+    IN_Z    char* File
+    )
+{
+    ASSERT(NumberOfParameters == 2);
+    QWORD n = 0;
+    atoi64(&n, N, BASE_TEN);
+    PTHREAD* pThreads;
+    pThreads = NULL;
+    STATUS status;
+    QWORD suma = 0;
+    PVOID context=NULL;
+    PFILE_OBJECT pFileObject;
+    status = IoCreateFile(&pFileObject,
+        File,
+        FALSE,
+        FALSE,
+        TRUE
+    );
+    __try
+    {
+    pThreads = ExAllocatePoolWithTag(PoolAllocateZeroMemory,
+        sizeof(PTHREAD) * ((DWORD)n) ,
+        HEAP_TEST_TAG,
+        0);
+    if (pThreads == NULL)
+    {
+        LOG_FUNC_ERROR_ALLOC("ExAllocatePoolWithTag", sizeof(PTHREAD) * (n));
+        __leave;
+    }
+
+    for (DWORD i = 0; i < n; ++i)
+    {
+        char thName[MAX_PATH];
+
+        snprintf(thName, MAX_PATH, "CPU-bound-%u", i);
+
+        //pCtx[i].CpuUsage = CPU_BOUND_CPU_USAGE;
+        
+        status = ThreadCreate(thName,
+            ThreadPriorityDefault,
+            Test1,
+            context,
+            &pThreads[i]);
+        pThreads[i]->fisier = pFileObject;
+        pThreads[i]->sum = 0;
+        if (!SUCCEEDED(status))
+        {
+            LOG_FUNC_ERROR("ThreadCreate", status);
+            __leave;
+        }
+
+    }
+    // Wait for all the threads to finish their execution
+    for (DWORD i = 0; i < n; ++i)
+    {
+        ThreadWaitForTermination(pThreads[i],
+            &status);
+    }
+    for (DWORD i = 0; i < n; ++i)
+    {
+        suma = pThreads[i]->sum + suma;
+    }
+    // List the threads statistics
+    CmdListThreads(0);
+    
+    
+    
+    // Actually close the thread handles so the thread structures can be destroyed
+    for (DWORD i = 0; i < n; ++i)
+    {
+        ThreadCloseHandle(pThreads[i]);
+    }
+    }
+    __finally
+    {
+        if (pThreads != NULL)
+        {
+            ExFreePoolWithTag(pThreads, HEAP_TEST_TAG);
+            pThreads = NULL;
+        }
+    }
+    LOG("\n doamne ajuta %x\n", suma);
+}
+
+static
+STATUS
+(__cdecl _CmdMutexPrint) (
+    IN      PLIST_ENTRY     ListEntry,
+    IN_OPT  PVOID           FunctionContext
+    )
+{
+    PMUTEX mutex;
+
+    ASSERT(NULL != ListEntry);
+    ASSERT(NULL == FunctionContext);
+
+    mutex = CONTAINING_RECORD(ListEntry, MUTEX, AllList);
+    PTHREAD pThread = mutex->Holder;
+    if (pThread != NULL)
+    {
+        if (pThread->Parinte != NULL)
+        {
+            LOG("%6x%c", pThread->Parinte->Id, '|');
+        }
+        else
+        {
+            LOG("%6x%c", -1, '|');// black guy 
+        }
+        LOG("%6x%c", pThread->Id, '|');
+        LOG("%19s%c", pThread->Name, '|');
+        LOG("%4U%c", pThread->Priority, '|');
+        LOG("%7s%c", _CmdThreadStateToName(pThread->State), '|');
+        LOG("%9U%c", pThread->TickCountCompleted, '|');
+        LOG("%9U%c", pThread->TickCountEarly, '|');
+        LOG("%9U%c", pThread->TickCountCompleted + pThread->TickCountEarly, '|');
+        LOG("%9x%c", pThread->Process->Id, '|');
+        LOG("\n");
+    }
+    ThreadMutexWaitingList(&mutex->WaitingList);
+
+
+
+    return STATUS_SUCCESS;
+}
+void
+(__cdecl CmdEx5)(
+    IN          QWORD       NumberOfParameters
+    )
+{
+    STATUS status;
+
+    ASSERT(NumberOfParameters == 0);
+    LOG("%50s", "Firu de executie holder pentru fiecare mutex|");
+    LOG("%50s", "Fire din waiting list pentru fiecare mutex|");
+    LOG("\n");
+
+    status = MutexExecuteForEachMutexEntry(_CmdMutexPrint, NULL);
+    ASSERT(SUCCEEDED(status));
+}
+
+
 
 #pragma warning(pop)

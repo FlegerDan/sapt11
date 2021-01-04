@@ -13,7 +13,7 @@
 #include "cmd_net_helper.h"
 #include "cmd_basic.h"
 #include "boot_module.h"
-#include "process_internal.h"
+
 #pragma warning(push)
 
 // warning C4029: declared formal parameter list different from definition
@@ -68,6 +68,9 @@ static const COMMAND_DEFINITION COMMANDS[] =
                 "\n\t$TIMES - number of times to wait for timer, valid only if periodic", CmdTestTimer, 1, 3},
 
     { "threads", "Displays all threads", CmdListThreads, 0, 0},
+    { "mutexes", "Displays all Mutexes", CmdEx5, 0, 0},
+    { "threadinfo", "Displays number of threads", CmdListInfoThreads, 0, 0},
+    { "calculatesum", "Create N threads to perform the sum of bytes of a file", CmdIHateYou, 2, 2},
     { "run", "$TEST [$NO_OF_THREADS]\n\tRuns the $TEST specified"
              "\n\t$NO_OF_THREADS the number of threads for running the test,"
              "if the number is not specified then it will run on 2 * NumberOfProcessors",
@@ -203,21 +206,7 @@ CmdRun(
     DWORD bytesRead;
 
     bytesRead = 0;
-    for (DWORD i = 0; i < 16; ++i)
-    {
-        STATUS status;
-        PPROCESS pProcess;
-        char fullPath[MAX_PATH];
 
-        pProcess = NULL;
-
-        status = snprintf(fullPath, MAX_PATH, "%sAPPLIC~1\\VirtualAllocNormal.exe",
-            IomuGetSystemPartitionPath());
-        ASSERT(SUCCEEDED(status));
-
-        status = ProcessCreate(fullPath, NULL, &pProcess);
-        ASSERT(SUCCEEDED(status));
-    }
     exit = _CmdExecuteModuleCommands();
     while (!exit)
     {

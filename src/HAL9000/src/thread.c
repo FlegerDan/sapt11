@@ -11,6 +11,7 @@
 #include "pe_exports.h"
 
 #define TID_INCREMENT               4
+#define TID_DECREMENT              -1
 
 #define THREAD_TIME_SLICE           1
 
@@ -40,6 +41,12 @@ typedef struct _THREAD_SYSTEM_DATA
 
 static THREAD_SYSTEM_DATA m_threadSystemData;
 
+
+/*
+1. Modify the way in which thread ID allocation works, such that the TIDs are allocated in the following decreasing order:
+the first thread will have TID MAX_QWORD, the second MAX_QWORD - 1, etc.
+Display at thread creation the message "Thread [tid = 0x%X] is being created".
+*/
 __forceinline
 static
 TID
@@ -47,9 +54,11 @@ _ThreadSystemGetNextTid(
     void
     )
 {
+    
     static volatile TID __currentTid = 0;
 
-    return _InterlockedExchangeAdd64(&__currentTid, TID_INCREMENT);
+    
+    return _InterlockedExchangeAdd64(&__currentTid, TID_DECREMENT);
 }
 
 static
@@ -412,9 +421,12 @@ ThreadCreateEx(
     {
         ThreadUnblock(pThread);
     }
+    LOG("Thread [tid = 0x%X] is being created", ThreadGetId(pThread));
 
+    //(GetCurrentThread()->Copii, pThread);
     *Thread = pThread;
 
+    InsertHeadList(&GetCurrentThread()->CopiiList, &pThread->Copil);
     return status;
 }
 
@@ -490,6 +502,7 @@ ThreadYield(
     LOG_TRACE_THREAD("Returned from _ThreadSchedule\n");
 
     CpuIntrSetState(oldState);
+    pThread->TimesYielded = (pThread->TimesYielded) + 1;
 }
 
 void
@@ -599,6 +612,8 @@ ThreadWaitForTermination(
     ExEventWaitForSignal(&Thread->TerminationEvt);
 
     *ExitStatus = Thread->ExitStatus;
+
+    LOG("Thread [tid = 0x%X] yielded %u times", ThreadGetId(Thread), Thread->TimesYielded);
 }
 
 void
@@ -620,6 +635,7 @@ ThreadTerminate(
 
     // it's not a problem if the thread already finished
     _InterlockedOr(&Thread->Flags, THREAD_FLAG_FORCE_TERMINATE_PENDING );
+    LOG("Thread [tid = 0x%X] yielded %u times", ThreadGetId(Thread), Thread->TimesYielded);
 }
 
 const
@@ -793,10 +809,16 @@ _ThreadInit(
         pThread->Id = _ThreadSystemGetNextTid();
         pThread->State = ThreadStateBlocked;
         pThread->Priority = Priority;
+        pThread->TimesYielded = 0;
+        pThread->Parinte = GetCurrentThread();
+
+        
 
         LockInit(&pThread->BlockLock);
-
+        
         LockAcquire(&m_threadSystemData.AllThreadsLock, &oldIntrState);
+        //InsertHeadList(&GetCurrentThread()->Copii, );
+        InitializeListHead(&pThread->CopiiList);
         InsertTailList(&m_threadSystemData.AllThreadsList, &pThread->AllList);
         LockRelease(&m_threadSystemData.AllThreadsLock, oldIntrState);
     }
@@ -950,8 +972,7 @@ _ThreadSetupMainThreadUserStack(
     ASSERT(ResultingStack != NULL);
     ASSERT(Process != NULL);
 
-    //*ResultingStack = InitialStack;
-    *ResultingStack = (PVOID)PtrDiff(InitialStack, SHADOW_STACK_SIZE + sizeof(PVOID));
+    *ResultingStack = InitialStack;
 
     return STATUS_SUCCESS;
 }
@@ -1239,4 +1260,127 @@ _ThreadKernelFunction(
 
     ThreadExit(exitStatus);
     NOT_REACHED;
+}
+
+
+void ThreadGetNrThreads
+(
+   OUT QWORD * nrexist,
+   OUT QWORD* nrblocked,
+   OUT QWORD* nrready
+)
+{
+    INTR_STATE oldState;
+    //PTHREAD returnare = NULL;
+    //PTHREAD ttest = GetCurrentThread();
+    //PPROCESS proces = GetCurrentProcess();
+    //LockAcquire(&m_threadSystemData.AllThreadsLock, &oldState);
+    PPROCESS proces = ProcessRetrieveSystemProcess();
+    LockAcquire(&proces->ThreadListLock, &oldState);
+    
+    //test->ThreadList
+
+
+    //PLIST_ENTRY ListHead = &m_threadSystemData.AllThreadsList;
+    //PLIST_ENTRY ListHead=& proces->ThreadList;
+
+    PLIST_ENTRY ListHead = &proces->ThreadList;
+    STATUS status;
+    LIST_ENTRY* pCurListEntry;
+
+    if (NULL == ListHead)
+    {
+        LOG_ERROR("listHead NULL");
+    }
+
+    /*
+    #ifdef DEBUG
+        ASSERT(_ValidateListEntry(ListHead));
+    #endif
+    */
+
+    status = STATUS_SUCCESS;
+
+    pCurListEntry = ListHead->Flink;
+    while (pCurListEntry != ListHead)
+    {
+        ASSERT_INFO(NULL != pCurListEntry, "List entry is NULL\n");
+        PLIST_ENTRY test = pCurListEntry;
+        //status = Function(pCurListEntry, Context);
+        PTHREAD pthread = CONTAINING_RECORD(test, THREAD, ProcessList);
+        *nrexist = *nrexist + 1;
+        if (pthread->State == ThreadStateReady)
+        {
+            *nrready = *nrready + 1;
+        }
+        else
+        {
+            if (pthread->State == ThreadStateBlocked)
+            {
+                *nrblocked = *nrblocked + 1;
+            }
+        }
+       
+        pCurListEntry = pCurListEntry->Flink;
+    }
+
+    LockRelease(&proces->ThreadListLock, oldState);
+    //LockRelease(&m_threadSystemData.AllThreadsLock, oldState);
+    
+}
+
+
+void ThreadMutexWaitingList
+(
+    IN PLIST_ENTRY param
+)
+{
+    INTR_STATE oldState;
+    //PTHREAD returnare = NULL;
+    //PTHREAD ttest = GetCurrentThread();
+    //PPROCESS proces = GetCurrentProcess();
+    //LockAcquire(&m_threadSystemData.AllThreadsLock, &oldState);
+    PPROCESS proces = ProcessRetrieveSystemProcess();
+    LockAcquire(&proces->ThreadListLock, &oldState);
+
+    //test->ThreadList
+
+
+    //PLIST_ENTRY ListHead = &m_threadSystemData.AllThreadsList;
+    //PLIST_ENTRY ListHead=& proces->ThreadList;
+
+    PLIST_ENTRY ListHead = param;//&proces->ThreadList;
+    STATUS status;
+    LIST_ENTRY* pCurListEntry;
+
+    if (NULL == ListHead)
+    {
+        LOG_ERROR("listHead NULL");
+    }
+
+    /*
+    #ifdef DEBUG
+        ASSERT(_ValidateListEntry(ListHead));
+    #endif
+    */
+
+    status = STATUS_SUCCESS;
+
+    pCurListEntry = ListHead->Flink;
+    while (pCurListEntry != ListHead)
+    {
+        ASSERT_INFO(NULL != pCurListEntry, "List entry is NULL\n");
+        PLIST_ENTRY test = pCurListEntry;
+        //status = Function(pCurListEntry, Context);
+        PTHREAD pthread = CONTAINING_RECORD(test, THREAD, ReadyList);
+        if (pthread != NULL)
+        {
+        LOG("\nid thread din waiting list:%x\n", pthread->Id);
+        }
+        pCurListEntry = pCurListEntry->Flink;
+    }
+
+    LockRelease(&proces->ThreadListLock, oldState);
+    //LockRelease(&m_threadSystemData.AllThreadsLock, oldState);
+
 }

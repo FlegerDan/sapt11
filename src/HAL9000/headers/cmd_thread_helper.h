@@ -2,7 +2,11 @@
 
 #include "cmd_common.h"
 
+
+FUNC_GenericCommand CmdEx5;
 FUNC_GenericCommand CmdListCpus;
+FUNC_GenericCommand CmdIHateYou;
+FUNC_GenericCommand CmdListInfoThreads;
 FUNC_GenericCommand CmdListThreads;
 FUNC_GenericCommand CmdYield;
 FUNC_GenericCommand CmdRunTest;

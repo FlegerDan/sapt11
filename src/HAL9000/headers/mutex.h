@@ -9,7 +9,7 @@ typedef struct _MUTEX
 
     BYTE                CurrentRecursivityDepth;
     BYTE                MaxRecursivityDepth;
-
+    LIST_ENTRY              AllList;
     _Guarded_by_(MutexLock)
     LIST_ENTRY          WaitingList;
     struct _THREAD*     Holder;
@@ -60,3 +60,14 @@ void
 MutexRelease(
     INOUT       PMUTEX      Mutex
     );
+STATUS
+MutexExecuteForEachMutexEntry(
+    IN      PFUNC_ListFunction  Function,
+    IN_OPT  PVOID               Context
+);
+
+void
+_No_competing_thread_
+MutexSystemPreinit(
+    void
+);

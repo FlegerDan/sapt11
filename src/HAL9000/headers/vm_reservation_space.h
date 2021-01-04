@@ -129,18 +129,3 @@ VmReservationReturnRightsForAddress(
     IN                      QWORD                   Size,
     OUT                     PAGE_RIGHTS*            Rights
     );
-
-
-STATUS
-VmGetNumberOfPagesCommitted
-(
-    IN PVMM_RESERVATION_SPACE ReservationSpace,
-    OUT PWORD NumberOfPagesCommited
-);
-
-STATUS
-VmGetNumberOfPagesReserved
-(
-    IN PVMM_RESERVATION_SPACE ReservationSpace,
-    OUT PWORD NumberOfPagesReserved
-);
